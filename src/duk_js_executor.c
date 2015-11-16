@@ -2959,6 +2959,11 @@ DUK_LOCAL DUK_NOINLINE void duk__js_execute_bytecode_inner(duk_hthread *entry_th
 			tv_obj = NULL;  /* invalidated */
 			tv_key = NULL;  /* invalidated */
 
+			/* FIXME: it'd be nice to emit a readable error for non-callable
+			 * target here but E5 evaluation order requires that such an error
+			 * must be thrown after argument evaluation.
+			 */
+
 			/* Note: target registers a and a+1 may overlap with DUK__REGP(b)
 			 * and DUK__REGCONSTP(c).  Careful here.
 			 */
