@@ -474,3 +474,41 @@ DUK_INTERNAL void duk_hthread_catchstack_unwind(duk_hthread *thr, duk_size_t new
 
 	/* note: any entries above the catchstack top are garbage and not zeroed */
 }
+
+#if defined(DUK_USE_REFZERO_FINALIZER_TORTURE)
+DUK_INTERNAL void duk_hthread_valstack_torture_realloc(duk_hthread *thr) {
+	/* FIXME */
+}
+
+DUK_INTERNAL void duk_hthread_callstack_torture_realloc(duk_hthread *thr) {
+	duk_size_t alloc_size;
+	duk_activation *new_ptr;
+
+	alloc_size = sizeof(duk_activation) * thr->callstack_size;
+	DUK_ASSERT(alloc_size > 0);
+	new_ptr = (duk_activation *) DUK_ALLOC(thr->heap, alloc_size);
+	if (new_ptr) {
+		DUK_MEMCPY((void *) new_ptr, (const void *) thr->callstack, alloc_size);
+		thr->callstack = new_ptr;
+		/* No change in size. */
+	} else {
+		DUK_D(DUK_DPRINT("failed to realloc callstack for torture, ignore"));
+	}
+}
+
+DUK_INTERNAL void duk_hthread_catchstack_torture_realloc(duk_hthread *thr) {
+	duk_size_t alloc_size;
+	duk_catcher *new_ptr;
+
+	alloc_size = sizeof(duk_catcher) * thr->catchstack_size;
+	DUK_ASSERT(alloc_size > 0);
+	new_ptr = (duk_catcher *) DUK_ALLOC(thr->heap, alloc_size);
+	if (new_ptr) {
+		DUK_MEMCPY((void *) new_ptr, (const void *) thr->catchstack, alloc_size);
+		thr->catchstack = new_ptr;
+		/* No change in size. */
+	} else {
+		DUK_D(DUK_DPRINT("failed to realloc catchstack for torture, ignore"));
+	}
+}
+#endif  /* DUK_USE_REFZERO_FINALIZER_TORTURE */

@@ -168,17 +168,23 @@ DUK_INTERNAL void duk_heaphdr_refcount_finalize(duk_hthread *thr, duk_heaphdr *h
 
 #if defined(DUK_USE_REFZERO_FINALIZER_TORTURE)
 DUK_LOCAL duk_ret_t duk__refcount_fake_finalizer(duk_context *ctx) {
-	DUK_UNREF(ctx);
+	duk_hthread *thr = (duk_hthread *) ctx;
+
 	DUK_D(DUK_DPRINT("fake refcount torture finalizer executed"));
 #if 0
 	DUK_DD(DUK_DDPRINT("fake torture finalizer for: %!T", duk_get_tval(ctx, 0)));
 #endif
+
 	/* Require a lot of stack to force a value stack grow/shrink. */
 	duk_require_stack(ctx, 100000);
 
-	/* XXX: do something to force a callstack grow/shrink, perhaps
-	 * just a manual forced resize?
+	/* Force a reallocation with pointer change for value, call, and
+	 * catch stacks to maximize side effects.
 	 */
+	duk_hthread_valstack_torture_realloc(thr);
+	duk_hthread_callstack_torture_realloc(thr);
+	duk_hthread_catchstack_torture_realloc(thr);
+
 	return 0;
 }
 
