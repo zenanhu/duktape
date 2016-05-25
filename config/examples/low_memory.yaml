@@ -78,3 +78,7 @@ DUK_USE_REGEXP_CANON_WORKAROUND: false
 #DUK_USE_ROM_OBJECTS: true
 #DUK_USE_ROM_GLOBAL_INHERIT: true  # select inherit or clone; inherit recommended
 #DUK_USE_ROM_GLOBAL_CLONE: false
+
+# Consider switching alignment to align-by-1 for more compact struct layouts
+# if the architecture supports it.
+#DUK_USE_ALIGN_BY: 1
