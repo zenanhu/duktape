@@ -817,9 +817,9 @@ def emit_default_from_config_meta(ret, doc, forced_opts, undef_done):
 	defname = doc['define']
 	defval = forced_opts.get(defname, doc['default'])
 
-	if defval == True:
+	if isinstance(defval, bool) and defval is True:
 		ret.line('#define ' + defname)
-	elif defval == False:
+	elif isinstance(defval, bool) and defval is False:
 		if not undef_done:
 			ret.line('#undef ' + defname)
 		else:
