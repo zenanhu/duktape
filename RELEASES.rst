@@ -1696,6 +1696,13 @@ Planned
   useful on bare metal platforms where an external printf() or scanf()
   dependency may have a large footprint impact (often 10-30 kB) (GH-801)
 
+* Change default data alignment for x86, x64, and x32 from align-by-1 (no
+  alignment) to align-by-4 which may be marginally faster and avoids some
+  -fsanitize warnings (GH-814)
+
+* Fix a genconfig bug for handling config option overrides where the option
+  value is 1 (this was confused with "true") (GH-814)
+
 * Fix a harmless compilation warning related to a shadowed variable (GH-793,
   GH-794)
 
