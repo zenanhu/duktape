@@ -333,6 +333,7 @@ def main():
         'duk_bi_proxy.c',
         'duk_bi_regexp.c',
         'duk_bi_string.c',
+        'duk_bi_symbol.c',
         'duk_bi_thread.c',
         'duk_bi_thrower.c',
         'duk_dblunion.h.in',
