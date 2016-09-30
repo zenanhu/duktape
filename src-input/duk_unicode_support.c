@@ -30,6 +30,8 @@ DUK_INTERNAL const duk_int8_t duk_is_idchar_tab[128] = {
  *  XUTF-8 and CESU-8 encoding/decoding
  */
 
+/* FIXME: remove extended codepoint support but keep CESU-8 support. */
+
 DUK_INTERNAL duk_small_int_t duk_unicode_get_xutf8_length(duk_ucodepoint_t cp) {
 	duk_uint_fast32_t x = (duk_uint_fast32_t) cp;
 	if (x < 0x80UL) {
