@@ -31,32 +31,43 @@ Duktape custom hidden Symbols have an initial 0xFF byte prefix, which matches
 the existing convention for Duktape 1.x internal keys.  While all bytes in the
 range [0xC0,0xFE] are valid initial bytes for Duktape's extended UTF-8 flavor,
 the continuation bytes [0x80,0xBF] are never a valid first byte so they are used
-for symbols (and reserved for other future uses) in Duktape 2.x.
+for ES6 symbols (and reserved for other future uses) in Duktape 2.x.
 
 +-----------------------------------------------+-----------------------------------------------------------------+
 | Internal string format                        | Description                                                     |
 +-----------------------------------------------+-----------------------------------------------------------------+
-| <ff> SomeUpperCaseValue                       | Existing Duktape internal properties, now called hidden symbols.|
-|                                               | First byte is 0xFF, second is from [A-Z].                       |
+| <ff> SomeUpperCaseValue                       | Hidden symbol (Duktape specific) used by Duktape internals.     |
+|                                               | Previously called internal properties.  First byte is 0xFF,     |
+|                                               | second is from [A-Z].                                           |
 +-----------------------------------------------+-----------------------------------------------------------------+
-| <ff> anyOtherValue                            | Existing user internal properties, now called hidden symbols.   |
+| <ff> anyOtherValue                            | Hidden symbol (Duktape specific) used by application code.      |
 |                                               | First byte is 0xFF, second is ASCII (0x00-0x7f) but not         |
 |                                               | from [A-Z].                                                     |
 +-----------------------------------------------+-----------------------------------------------------------------+
-| <ff> <ff> anyOtherValue                       | Existing user internal properties, now called hidden symbols.   |
+| <ff> <ff> anyOtherValue                       | Hidden symbol (Duktape specific) used by application code.      |
 |                                               | First and second bytes are 0xFF, remaining bytes arbitrary.     |
 +-----------------------------------------------+-----------------------------------------------------------------+
-| <a0> symbolDescription                        | Global symbol with description 'symbolDescription' created      |
+| <80> symbolDescription                        | Global symbol with description 'symbolDescription' created      |
 |                                               | using Symbol.for().                                             |
 +-----------------------------------------------+-----------------------------------------------------------------+
-| <a1> symbolDescription <ff> uniqueSuffix      | Symbol with description 'symbolDescription' but with a trailing |
-|                                               | unique string to make the symbol unique.  The unique suffix is  |
+| <81> symbolDescription <ff> uniqueSuffix      | Local symbol with description 'symbolDescription'.  Trailing    |
+|                                               | unique string makes the symbol unique.  The unique suffix is    |
 |                                               | opaque and chosen arbitrarily by Duktape.  It's unique within a |
 |                                               | Duktape heap (across all global environments).                  |
 +-----------------------------------------------+-----------------------------------------------------------------+
-| <a1> <ff> uniqueSuffix                        | Anonymous symbol.  Unique suffix makes each such symbol unique. |
+| <81> <ff> uniqueSuffix                        | Local symbol with no description.  Unique suffix makes each     |
+|                                               | such symbol unique.  ES6 differentiates internally between      |
+|                                               | symbols with an empty string description vs. symbols with       |
+|                                               | an undefined description.  However, the two are treated the     |
+|                                               | same, so current representation doesn't distinguish them.       |
 +-----------------------------------------------+-----------------------------------------------------------------+
-| <a2 to bf>                                    | Initial bytes 0xA2 to 0xBF are reserved for future use.         |
+| <82 to bf>                                    | Initial bytes 0xA2 to 0xBF are reserved for future use.         |
++-----------------------------------------------+-----------------------------------------------------------------+
+| <00 to 7f>                                    | Valid ASCII initial byte.                                       |
++-----------------------------------------------+-----------------------------------------------------------------+
+| <c0 to f7>                                    | Valid standard UTF-8 (or CESU-8) initial byte.                  |
++-----------------------------------------------+-----------------------------------------------------------------+
+| <f8 to fe>                                    | Valid extended UTF-8 initial byte.                              |
 +-----------------------------------------------+-----------------------------------------------------------------+
 
 Useful comparisons (``p`` is pointer to string data) for internal use only:
