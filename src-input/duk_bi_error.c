@@ -172,6 +172,7 @@ DUK_LOCAL duk_ret_t duk__error_getter_helper(duk_context *ctx, duk_small_int_t o
 
 				h_func = duk_get_hobject(ctx, -2);  /* NULL for lightfunc */
 
+				/* FIXME: reject symbols? */
 				duk_get_prop_stridx(ctx, -2, DUK_STRIDX_NAME);
 				duk_get_prop_stridx(ctx, -3, DUK_STRIDX_FILE_NAME);
 
@@ -186,6 +187,7 @@ DUK_LOCAL duk_ret_t duk__error_getter_helper(duk_context *ctx, duk_small_int_t o
 				/* When looking for .fileName/.lineNumber, blame first
 				 * function which has a .fileName.
 				 */
+				/* FIXME: reject symbols? */
 				if (duk_is_string(ctx, -1)) {
 					if (output_type == DUK__OUTPUT_TYPE_FILENAME) {
 						return 1;
@@ -256,6 +258,8 @@ DUK_LOCAL duk_ret_t duk__error_getter_helper(duk_context *ctx, duk_small_int_t o
 						return 1;
 					}
 				}
+
+				/* FIXME: reject symbols here? Tracedata is trusted anyway */
 
 				duk_push_sprintf(ctx, "at [anon] (%s:%ld) internal",
 				                 (const char *) duk_get_string(ctx, -2), (long) pc);

@@ -16,6 +16,8 @@
 
 #include "duk_internal.h"
 
+/* FIXME: check encoding for Symbols */
+
 /*
  *  Local defines and forward declarations.
  */
@@ -1819,6 +1821,7 @@ DUK_LOCAL void duk__enc_object(duk_json_enc_ctx *js_ctx) {
 		                     (duk_tval *) duk_get_tval(ctx, idx_obj),
 		                     (duk_tval *) duk_get_tval(ctx, -1)));
 
+		/* FIXME: reject symbols here? */
 		h_key = duk_get_hstring(ctx, -1);
 		DUK_ASSERT(h_key != NULL);
 
@@ -1949,7 +1952,7 @@ DUK_LOCAL duk_bool_t duk__enc_value(duk_json_enc_ctx *js_ctx, duk_idx_t idx_hold
 	tv_holder = DUK_GET_TVAL_POSIDX(ctx, idx_holder);
 	DUK_ASSERT(DUK_TVAL_IS_OBJECT(tv_holder));
 	tv_key = DUK_GET_TVAL_NEGIDX(ctx, -1);
-	DUK_ASSERT(DUK_TVAL_IS_STRING(tv_key));
+	DUK_ASSERT(DUK_TVAL_IS_STRING(tv_key));  /* FIXME: symbols OK? */
 	(void) duk_hobject_getprop(thr, tv_holder, tv_key);
 
 	/* -> [ ... key val ] */
@@ -2045,6 +2048,7 @@ DUK_LOCAL duk_bool_t duk__enc_value(duk_json_enc_ctx *js_ctx, duk_idx_t idx_hold
 			duk_remove(ctx, -2);
 			break;
 		}
+		/* FIXME: Symbol? */
 		default: {
 			/* Normal object which doesn't get automatically coerced to a
 			 * primitive value.  Functions are checked for specially.  The
@@ -2112,6 +2116,8 @@ DUK_LOCAL duk_bool_t duk__enc_value(duk_json_enc_ctx *js_ctx, duk_idx_t idx_hold
 	case DUK_TAG_STRING: {
 		duk_hstring *h = DUK_TVAL_GET_STRING(tv);
 		DUK_ASSERT(h != NULL);
+
+		/* FIXME: reject Symbols and maybe internal strings too? */
 
 		duk__enc_quote_string(js_ctx, h);
 		break;
@@ -2198,6 +2204,7 @@ DUK_LOCAL duk_bool_t duk__enc_allow_into_proplist(duk_tval *tv) {
 
 	DUK_ASSERT(tv != NULL);
 	if (DUK_TVAL_IS_STRING(tv) || DUK_TVAL_IS_NUMBER(tv)) {
+		/* FIXME: reject symbol from proplist */
 		return 1;
 	} else if (DUK_TVAL_IS_OBJECT(tv)) {
 		h = DUK_TVAL_GET_OBJECT(tv);
@@ -2259,6 +2266,8 @@ DUK_LOCAL duk_bool_t duk__json_stringify_fast_value(duk_json_enc_ctx *js_ctx, du
 	}
 	case DUK_TAG_STRING: {
 		duk_hstring *h;
+
+		/* FIXME: symbols */
 
 		h = DUK_TVAL_GET_STRING(tv);
 		DUK_ASSERT(h != NULL);
@@ -2547,7 +2556,7 @@ DUK_LOCAL duk_bool_t duk__json_stringify_fast_value(duk_json_enc_ctx *js_ctx, du
 
 			tv_internal = duk_hobject_get_internal_value_tval_ptr(js_ctx->thr->heap, obj);
 			DUK_ASSERT(tv_internal != NULL);
-			DUK_ASSERT(DUK_TVAL_IS_STRING(tv_internal) ||
+			DUK_ASSERT(DUK_TVAL_IS_STRING(tv_internal) ||  /* FIXME: symbol special handling */
 			           DUK_TVAL_IS_NUMBER(tv_internal) ||
 			           DUK_TVAL_IS_BOOLEAN(tv_internal) ||
 			           DUK_TVAL_IS_POINTER(tv_internal));
@@ -2747,7 +2756,8 @@ void duk_bi_json_parse_helper(duk_context *ctx,
 	js_ctx->flag_ext_custom_or_compatible = flags & (DUK_JSON_FLAG_EXT_CUSTOM | DUK_JSON_FLAG_EXT_COMPATIBLE);
 #endif
 
-	h_text = duk_to_hstring(ctx, idx_value);  /* coerce in-place */
+	/* FIXME: reject internal strings too? */
+	h_text = duk_to_hstring(ctx, idx_value);  /* coerce in-place; rejects Symbols */
 	DUK_ASSERT(h_text != NULL);
 
 	/* JSON parsing code is allowed to read [p_start,p_end]: p_end is
@@ -2995,6 +3005,7 @@ void duk_bi_json_stringify_helper(duk_context *ctx,
 		js_ctx->h_gap = duk_get_hstring(ctx, -1);
 		DUK_ASSERT(js_ctx->h_gap != NULL);
 	} else if (duk_is_string(ctx, idx_space)) {
+		/* FIXME: reject symbol */
 		/* XXX: substring in-place at idx_place? */
 		duk_dup(ctx, idx_space);
 		duk_substring(ctx, -1, 0, 10);  /* clamp to 10 chars */

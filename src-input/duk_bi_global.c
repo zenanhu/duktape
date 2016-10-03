@@ -442,6 +442,7 @@ DUK_INTERNAL duk_ret_t duk_bi_global_object_eval(duk_context *ctx) {
 	 *  activation doesn't exist, call must be indirect.
 	 */
 
+	/* FIXME: reject symbol? will otherwise fail with SyntaxError. */
 	h = duk_get_hstring(ctx, 0);
 	if (!h) {
 		return 1;  /* return arg as-is */

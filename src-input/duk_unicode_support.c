@@ -1008,6 +1008,7 @@ DUK_INTERNAL void duk_unicode_case_convert_string(duk_hthread *thr, duk_small_in
 	const duk_uint8_t *p, *p_start, *p_end;
 	duk_codepoint_t prev, curr, next;
 
+	/* FIXME: symbols */
 	h_input = duk_require_hstring(ctx, -1);
 	DUK_ASSERT(h_input != NULL);
 

@@ -1810,7 +1810,7 @@ DUK_INTERNAL void duk_numconv_parse(duk_context *ctx, duk_small_int_t radix, duk
 		 */
 		duk_trim(ctx, -1);
 	}
-	h_str = duk_require_hstring(ctx, -1);
+	h_str = duk_require_hstring(ctx, -1);  /* FIXME: reject Symbol? not really necessary because fails anyway */
 	DUK_ASSERT(h_str != NULL);
 	p = (const duk_uint8_t *) DUK_HSTRING_GET_DATA(h_str);
 

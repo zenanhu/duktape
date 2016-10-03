@@ -257,6 +257,7 @@ DUK_INTERNAL void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint
 		 * consistent with how e.g. Object.keys() will process proxy trap
 		 * results (ES6, Section 19.1.2.14).
 		 */
+		/* FIXME: check behavior for Symbols */
 		if (duk_get_prop_index(ctx, -1, i) && duk_is_string(ctx, -1)) {
 			/* [ ... enum_target res trap_result val ] */
 			duk_push_true(ctx);
@@ -432,6 +433,7 @@ DUK_INTERNAL void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint
 			    !(enum_flags & DUK_ENUM_INCLUDE_NONENUMERABLE)) {
 				continue;
 			}
+			/* FIXME: Symbols; symbols only */
 			if (DUK_HSTRING_HAS_INTERNAL(k) &&
 			    !(enum_flags & DUK_ENUM_INCLUDE_INTERNAL)) {
 				continue;

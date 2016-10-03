@@ -122,6 +122,7 @@ DUK_INTERNAL_DECL duk_int_t duk_to_int_check_range(duk_context *ctx, duk_idx_t i
 #if defined(DUK_USE_BUFFEROBJECT_SUPPORT)
 DUK_INTERNAL_DECL duk_uint8_t duk_to_uint8clamped(duk_context *ctx, duk_idx_t idx);
 #endif
+DUK_INTERNAL_DECL duk_hstring *duk_to_property_key_hstring(duk_context *ctx, duk_idx_t idx);
 
 DUK_INTERNAL_DECL duk_hstring *duk_require_hstring(duk_context *ctx, duk_idx_t idx);
 DUK_INTERNAL_DECL duk_hobject *duk_require_hobject(duk_context *ctx, duk_idx_t idx);
@@ -195,6 +196,8 @@ DUK_INTERNAL_DECL void duk_pack(duk_context *ctx, duk_idx_t count);
 #if 0
 DUK_INTERNAL_DECL void duk_unpack(duk_context *ctx);
 #endif
+
+DUK_INTERNAL_DECL void duk_push_symbol_descriptive_string(duk_context *ctx, duk_hstring *h);
 
 /* Raw internal valstack access macros: access is unsafe so call site
  * must have a guarantee that the index is valid.  When that is the case,

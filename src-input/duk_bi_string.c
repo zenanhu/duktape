@@ -1,5 +1,9 @@
 /*
  *  String built-ins
+ *
+ *  Most String built-ins must only accept strings (or String objects).
+ *  Symbols, represented internally as strings, must be generally rejected.
+ *  The duk_push_this_coercible_to_string() helper does this automatically.
  */
 
 /* XXX: There are several limitations in the current implementation for
@@ -18,26 +22,46 @@
  */
 
 DUK_INTERNAL duk_ret_t duk_bi_string_constructor(duk_context *ctx) {
+	duk_tval *tv;
+	duk_small_uint_t tag;
+	duk_hstring *h;
+	duk_uint_t flags;
+
 	/* String constructor needs to distinguish between an argument not given at all
 	 * vs. given as 'undefined'.  We're a vararg function to handle this properly.
 	 */
 
-	if (duk_get_top(ctx) == 0) {
+	/* FIXME: copy current activation flags to thr, including current magic,
+	 * is_constructor_call etc.  This takes a few bytes in duk_hthread but
+	 * makes call sites smaller (there are >30 is_constructor_call and get
+	 * current magic call sites.
+	 */
+
+	/* FIXME: footprint optimize */
+	tv = duk_get_tval_or_unused(ctx, 0);
+	tag = DUK_TVAL_GET_TAG(tv);
+	if (tag == DUK_TAG_UNUSED) {
 		duk_push_hstring_stridx(ctx, DUK_STRIDX_EMPTY_STRING);
+		DUK_ASSERT_TOP(ctx, 1);
+	} else if (tag == DUK_TAG_STRING) {
+		h = DUK_TVAL_GET_STRING(tv);
+		DUK_ASSERT(h != NULL);
+		if (DUK_HSTRING_HAS_ES6SYMBOL(h)) {
+			duk_push_symbol_descriptive_string(ctx, h);
+			duk_replace(ctx, 0);
+		}
 	} else {
 		duk_to_string(ctx, 0);
 	}
 	DUK_ASSERT(duk_is_string(ctx, 0));
-	duk_set_top(ctx, 1);
+	/* Top may be 1 or larger. */
 
 	if (duk_is_constructor_call(ctx)) {
-		duk_push_object_helper(ctx,
-		                       DUK_HOBJECT_FLAG_EXTENSIBLE |
-		                       DUK_HOBJECT_FLAG_EXOTIC_STRINGOBJ |
-		                       DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_STRING),
-		                       DUK_BIDX_STRING_PROTOTYPE);
-
 		/* String object internal value is immutable */
+		flags = DUK_HOBJECT_FLAG_EXTENSIBLE |
+		        DUK_HOBJECT_FLAG_EXOTIC_STRINGOBJ |
+		        DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_STRING);
+		duk_push_object_helper(ctx, flags, DUK_BIDX_STRING_PROTOTYPE);
 		duk_dup_0(ctx);
 		duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_INT_VALUE, DUK_PROPDESC_FLAGS_NONE);
 	}
@@ -99,6 +123,8 @@ DUK_INTERNAL duk_ret_t duk_bi_string_prototype_to_string(duk_context *ctx) {
 	duk_push_this(ctx);
 	tv = duk_require_tval(ctx, -1);
 	DUK_ASSERT(tv != NULL);
+
+	/* FIXME: reject symbols */
 
 	if (DUK_TVAL_IS_STRING(tv)) {
 		/* return as is */
@@ -219,7 +245,7 @@ DUK_INTERNAL duk_ret_t duk_bi_string_prototype_substr(duk_context *ctx) {
 	 * ("undefined" and "null").
 	 */
 	duk_push_this(ctx);
-	h = duk_to_hstring(ctx, -1);
+	h = duk_to_hstring(ctx, -1);  /* FIXME: ok; symbol fails, document */
 	DUK_ASSERT(h != NULL);
 	len = (duk_int_t) DUK_HSTRING_GET_CHARLEN(h);
 
@@ -448,6 +474,8 @@ DUK_INTERNAL duk_ret_t duk_bi_string_prototype_replace(duk_context *ctx) {
 	DUK_BW_INIT_PUSHBUF(thr, bw, DUK_HSTRING_GET_BYTELEN(h_input));  /* input size is good output starting point */
 
 	DUK_ASSERT_TOP(ctx, 4);
+
+	/* FIXME: check symbol behavior here */
 
 	/* stack[0] = search value
 	 * stack[1] = replace value
@@ -933,6 +961,7 @@ DUK_INTERNAL duk_ret_t duk_bi_string_prototype_split(duk_context *ctx) {
 			p_end = p_start + DUK_HSTRING_GET_BYTELEN(h_input);
 			p = p_start + prev_match_end_boff;
 
+			/* FIXME: symbol */
 			h_sep = duk_get_hstring(ctx, 0);
 			DUK_ASSERT(h_sep != NULL);
 			q_start = DUK_HSTRING_GET_DATA(h_sep);

@@ -561,6 +561,7 @@ DUK_LOCAL duk_hbuffer *duk__hbufobj_fixed_from_argvalue(duk_context *ctx) {
 	}
 	case DUK_TYPE_STRING: {
 		/* ignore encoding for now */
+		/* FIXME: duk_to_buffer() rejects symbols now, OK? */
 		duk_dup_0(ctx);
 		(void) duk_to_buffer(ctx, -1, &buf_size);
 		break;
@@ -1355,6 +1356,7 @@ DUK_INTERNAL duk_ret_t duk_bi_nodejs_buffer_fill(duk_context *ctx) {
 	/* [ value offset end ] */
 
 	if (duk_is_string(ctx, 0)) {
+		/* FIXME: accept symbols? */
 		fill_str_ptr = (const duk_uint8_t *) duk_get_lstring(ctx, 0, &fill_str_len);
 		DUK_ASSERT(fill_str_ptr != NULL);
 	} else {
@@ -1425,6 +1427,7 @@ DUK_INTERNAL duk_ret_t duk_bi_nodejs_buffer_write(duk_context *ctx) {
 	DUK_ASSERT(h_this != NULL);
 
 	/* Argument must be a string, e.g. a buffer is not allowed. */
+	/* FIXME: reject symbol? */
 	str_data = (const duk_uint8_t *) duk_require_lstring(ctx, 0, &str_len);
 
 	duk__resolve_offset_opt_length(ctx, h_this, 1, 2, &offset, &length, 0 /*throw_flag*/);

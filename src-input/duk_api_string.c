@@ -46,8 +46,7 @@ DUK_LOCAL void duk__concat_and_join_helper(duk_context *ctx, duk_idx_t count_in,
 
 	for (i = count; i >= 1; i--) {
 		duk_size_t new_len;
-		duk_to_string(ctx, -((duk_idx_t) i));
-		h = duk_require_hstring(ctx, -((duk_idx_t) i));
+		h = duk_to_hstring(ctx, -((duk_idx_t) i));
 		new_len = len + (duk_size_t) DUK_HSTRING_GET_BYTELEN(h);
 
 		/* Impose a string maximum length, need to handle overflow
@@ -130,6 +129,7 @@ DUK_EXTERNAL void duk_decode_string(duk_context *ctx, duk_idx_t idx, duk_decode_
 
 	DUK_ASSERT_CTX_VALID(ctx);
 
+	/* FIXME: accepts symbol, probably OK in the C API */
 	h_input = duk_require_hstring(ctx, idx);
 	DUK_ASSERT(h_input != NULL);
 
@@ -158,6 +158,7 @@ DUK_EXTERNAL void duk_map_string(duk_context *ctx, duk_idx_t idx, duk_map_char_f
 
 	idx = duk_normalize_index(ctx, idx);
 
+	/* FIXME: accepts Symbol, OK */
 	h_input = duk_require_hstring(ctx, idx);
 	DUK_ASSERT(h_input != NULL);
 
@@ -196,6 +197,7 @@ DUK_EXTERNAL void duk_substring(duk_context *ctx, duk_idx_t idx, duk_size_t star
 
 	DUK_ASSERT_CTX_VALID(ctx);
 
+	/* FIXME: accepts symbol, OK */
 	idx = duk_require_normalize_index(ctx, idx);
 	h = duk_require_hstring(ctx, idx);
 	DUK_ASSERT(h != NULL);
@@ -243,6 +245,7 @@ DUK_EXTERNAL void duk_trim(duk_context *ctx, duk_idx_t idx) {
 
 	DUK_ASSERT_CTX_VALID(ctx);
 
+	/* FIXME: accepts symbol, OK */
 	idx = duk_require_normalize_index(ctx, idx);
 	h = duk_require_hstring(ctx, idx);
 	DUK_ASSERT(h != NULL);
@@ -317,6 +320,7 @@ DUK_EXTERNAL duk_codepoint_t duk_char_code_at(duk_context *ctx, duk_idx_t idx, d
 
 	DUK_ASSERT_CTX_VALID(ctx);
 
+	/* FIXME: accepts symbol, OK */
 	h = duk_require_hstring(ctx, idx);
 	DUK_ASSERT(h != NULL);
 

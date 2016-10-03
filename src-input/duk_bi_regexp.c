@@ -62,13 +62,13 @@ DUK_INTERNAL duk_ret_t duk_bi_regexp_constructor(duk_context *ctx) {
 			duk_push_string(ctx, "");
 		} else {
 			duk_dup_0(ctx);
-			duk_to_string(ctx, -1);
+			duk_to_string(ctx, -1);  /* Rejects Symbols. */
 		}
 		if (duk_is_undefined(ctx, 1)) {
 			duk_push_string(ctx, "");
 		} else {
 			duk_dup(ctx, 1);
-			duk_to_string(ctx, -1);
+			duk_to_string(ctx, -1);  /* Rejects Symbols. */
 		}
 
 		/* [ ... pattern flags ] */
@@ -150,7 +150,7 @@ DUK_INTERNAL duk_ret_t duk_bi_regexp_prototype_to_string(duk_context *ctx) {
 
 	duk_get_prop_stridx(ctx, 0, DUK_STRIDX_SOURCE);
 	duk_get_prop_stridx(ctx, 0, DUK_STRIDX_INT_BYTECODE);
-	h_bc = duk_get_hstring(ctx, -1);
+	h_bc = duk_get_hstring(ctx, -1);  /* Rely on property existing, no need for Symbol check. */
 	DUK_ASSERT(h_bc != NULL);
 	DUK_ASSERT(DUK_HSTRING_GET_BYTELEN(h_bc) >= 1);
 	DUK_ASSERT(DUK_HSTRING_GET_CHARLEN(h_bc) >= 1);
@@ -164,6 +164,7 @@ DUK_INTERNAL duk_ret_t duk_bi_regexp_prototype_to_string(duk_context *ctx) {
 	 * the other alternative.  Use duk_require_string() for format
 	 * safety (although the source property should always exist).
 	 */
+	/* FIXME: duk_require_string_nosymbol? */
 	duk_push_sprintf(ctx, "/%s/%s%s%s",
 	                 (const char *) duk_require_string(ctx, -2),  /* require to be safe */
 	                 (re_flags & DUK_RE_FLAG_GLOBAL) ? "g" : "",
@@ -177,7 +178,7 @@ DUK_INTERNAL duk_ret_t duk_bi_regexp_prototype_to_string(duk_context *ctx) {
 	re_flags &= 0x07;
 	DUK_ASSERT(re_flags >= 0 && re_flags <= 7);  /* three flags */
 	duk_push_sprintf(ctx, "/%s/%s",
-	                 (const char *) duk_require_string(ctx, -2),
+	                 (const char *) duk_require_string(ctx, -2),  /* FIXME: duk_require_string_nosymbol? */
 	                 (const char *) (flag_strings + flag_offsets[re_flags]));
 #endif
 

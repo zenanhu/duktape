@@ -1437,6 +1437,7 @@ DUK_INTERNAL duk_ret_t duk_bi_date_constructor(duk_context *ctx) {
 	} else if (nargs == 1) {
 		duk_to_primitive(ctx, 0, DUK_HINT_NONE);
 		if (duk_is_string(ctx, 0)) {
+			/* FIXME: reject symbols */
 			duk__parse_string(ctx, duk_to_string(ctx, 0));
 			duk_replace(ctx, 0);  /* may be NaN */
 		}

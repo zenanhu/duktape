@@ -136,10 +136,12 @@ DUK_LOCAL duk_uint32_t duk__tval_fastint_to_arr_idx(duk_tval *tv) {
 }
 #endif  /* DUK_USE_FASTINT */
 
-/* Push an arbitrary duk_tval to the stack, coerce it to string, and return
- * both a duk_hstring pointer and an array index (or DUK__NO_ARRAY_INDEX).
+/* Push an arbitrary duk_tval to the stack, and coerce it to a string using
+ * ES6 ToPropertyKey() (http://www.ecma-international.org/ecma-262/6.0/#sec-topropertykey).
+ * Also check if it's a valid array index and return that (or DUK__NO_ARRAY_INDEX
+ * if not).
  */
-DUK_LOCAL duk_uint32_t duk__push_tval_to_hstring_arr_idx(duk_context *ctx, duk_tval *tv, duk_hstring **out_h) {
+DUK_LOCAL duk_uint32_t duk__push_tval_to_property_key(duk_context *ctx, duk_tval *tv, duk_hstring **out_h) {
 	duk_uint32_t arr_idx;
 	duk_hstring *h;
 
@@ -147,9 +149,24 @@ DUK_LOCAL duk_uint32_t duk__push_tval_to_hstring_arr_idx(duk_context *ctx, duk_t
 	DUK_ASSERT(tv != NULL);
 	DUK_ASSERT(out_h != NULL);
 
+	/* FIXME: The revised ES6 ToPropertyKey() handling (ES5.1 was just
+	 * ToString()) involves a ToPrimitive(), a symbol check, and finally
+	 * a ToString().  Figure out the best way to have a good fast path
+	 * but still be compliant and share code.
+	 */
+
 	duk_push_tval(ctx, tv);
-	duk_to_string(ctx, -1);
-	h = duk_get_hstring(ctx, -1);
+	if (DUK_TVAL_IS_STRING(tv)) {
+		/* Most important path: strings and plain symbols are used as
+		 * is.  For symbols the array index check below is unnecessary
+		 * (they're never valid array indices) but checking that the
+		 * string is a symbol would make the plain string path slower
+		 * unnecessarily.
+		 */
+		h = DUK_TVAL_GET_STRING(tv);
+	} else {
+		h = duk_to_property_key_hstring(ctx, -1);
+	}
 	DUK_ASSERT(h != NULL);
 	*out_h = h;
 
@@ -439,6 +456,7 @@ DUK_LOCAL duk_bool_t duk__proxy_check_prop(duk_hthread *thr, duk_hobject *obj, d
 		duk_hstring *h_key = (duk_hstring *) DUK_TVAL_GET_STRING(tv_key);
 		DUK_ASSERT(h_key != NULL);
 		if (DUK_HSTRING_HAS_INTERNAL(h_key)) {
+			/* FIXME: ES6Symbol? */
 			DUK_DDD(DUK_DDDPRINT("internal key, skip proxy handler and apply to target"));
 			return 0;
 		}
@@ -1385,6 +1403,7 @@ DUK_INTERNAL duk_hstring *duk_hobject_get_internal_value_string(duk_heap *heap, 
 		duk_hstring *h;
 		DUK_ASSERT(DUK_TVAL_IS_STRING(&tv));
 		h = DUK_TVAL_GET_STRING(&tv);
+		/* FIXME: no check for symbol, should be OK */
 		return h;
 	}
 
@@ -2341,6 +2360,14 @@ DUK_INTERNAL duk_bool_t duk_hobject_getprop(duk_hthread *thr, duk_tval *tv_obj, 
 		duk_hstring *h = DUK_TVAL_GET_STRING(tv_obj);
 		duk_int_t pop_count;
 
+		if (DUK_HSTRING_HAS_ES6SYMBOL(h)) {
+			/* Symbols don't have virtual properties. */
+			/* FIXME: what about hidden symbols? */
+			DUK_DDD(DUK_DDDPRINT("base object is a symbol, start lookup from symbol prototype"));
+			curr = thr->builtins[DUK_BIDX_SYMBOL_PROTOTYPE];
+			break;
+		}
+
 #if defined(DUK_USE_FASTINT)
 		if (DUK_TVAL_IS_FASTINT(tv_key)) {
 			arr_idx = duk__tval_fastint_to_arr_idx(tv_key);
@@ -2353,7 +2380,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_getprop(duk_hthread *thr, duk_tval *tv_obj, 
 			DUK_DDD(DUK_DDDPRINT("base object string, key is a fast-path number; arr_idx %ld", (long) arr_idx));
 			pop_count = 0;
 		} else {
-			arr_idx = duk__push_tval_to_hstring_arr_idx(ctx, tv_key, &key);
+			arr_idx = duk__push_tval_to_property_key(ctx, tv_key, &key);
 			DUK_ASSERT(key != NULL);
 			DUK_DDD(DUK_DDDPRINT("base object string, key is a non-fast-path number; after "
 			                     "coercion key is %!T, arr_idx %ld",
@@ -2377,7 +2404,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_getprop(duk_hthread *thr, duk_tval *tv_obj, 
 			/* This is a pretty awkward control flow, but we need to recheck the
 			 * key coercion here.
 			 */
-			arr_idx = duk__push_tval_to_hstring_arr_idx(ctx, tv_key, &key);
+			arr_idx = duk__push_tval_to_property_key(ctx, tv_key, &key);
 			DUK_ASSERT(key != NULL);
 			DUK_DDD(DUK_DDDPRINT("base object string, key is a non-fast-path number; after "
 			                     "coercion key is %!T, arr_idx %ld",
@@ -2393,6 +2420,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_getprop(duk_hthread *thr, duk_tval *tv_obj, 
 			                     (duk_tval *) duk_get_tval(ctx, -1)));
 			return 1;
 		}
+
 		DUK_DDD(DUK_DDDPRINT("base object is a string, start lookup from string prototype"));
 		curr = thr->builtins[DUK_BIDX_STRING_PROTOTYPE];
 		goto lookup;  /* avoid double coercion */
@@ -2445,7 +2473,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_getprop(duk_hthread *thr, duk_tval *tv_obj, 
 				/* Target object must be checked for a conflicting
 				 * non-configurable property.
 				 */
-				arr_idx = duk__push_tval_to_hstring_arr_idx(ctx, tv_key, &key);
+				arr_idx = duk__push_tval_to_property_key(ctx, tv_key, &key);
 				DUK_ASSERT(key != NULL);
 
 				if (duk__get_own_propdesc_raw(thr, h_target, key, arr_idx, &desc, DUK_GETDESC_FLAG_PUSH_VALUE)) {
@@ -2486,7 +2514,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_getprop(duk_hthread *thr, duk_tval *tv_obj, 
 #endif  /* DUK_USE_ES6_PROXY */
 
 		if (DUK_HOBJECT_HAS_EXOTIC_ARGUMENTS(curr)) {
-			arr_idx = duk__push_tval_to_hstring_arr_idx(ctx, tv_key, &key);
+			arr_idx = duk__push_tval_to_property_key(ctx, tv_key, &key);
 			DUK_ASSERT(key != NULL);
 
 			if (duk__check_arguments_map_for_get(thr, curr, key, &desc)) {
@@ -2531,7 +2559,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_getprop(duk_hthread *thr, duk_tval *tv_obj, 
 			DUK_DDD(DUK_DDDPRINT("base object buffer, key is a fast-path number; arr_idx %ld", (long) arr_idx));
 			pop_count = 0;
 		} else {
-			arr_idx = duk__push_tval_to_hstring_arr_idx(ctx, tv_key, &key);
+			arr_idx = duk__push_tval_to_property_key(ctx, tv_key, &key);
 			DUK_ASSERT(key != NULL);
 			DUK_DDD(DUK_DDDPRINT("base object buffer, key is a non-fast-path number; after "
 			                     "coercion key is %!T, arr_idx %ld",
@@ -2554,7 +2582,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_getprop(duk_hthread *thr, duk_tval *tv_obj, 
 			/* This is a pretty awkward control flow, but we need to recheck the
 			 * key coercion here.
 			 */
-			arr_idx = duk__push_tval_to_hstring_arr_idx(ctx, tv_key, &key);
+			arr_idx = duk__push_tval_to_property_key(ctx, tv_key, &key);
 			DUK_ASSERT(key != NULL);
 			DUK_DDD(DUK_DDDPRINT("base object buffer, key is a non-fast-path number; after "
 			                     "coercion key is %!T, arr_idx %ld",
@@ -2607,7 +2635,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_getprop(duk_hthread *thr, duk_tval *tv_obj, 
 		duk_int_t lf_flags = DUK_TVAL_GET_LIGHTFUNC_FLAGS(tv_obj);
 
 		/* Must coerce key: if key is an object, it may coerce to e.g. 'length'. */
-		arr_idx = duk__push_tval_to_hstring_arr_idx(ctx, tv_key, &key);
+		arr_idx = duk__push_tval_to_property_key(ctx, tv_key, &key);
 
 		if (key == DUK_HTHREAD_STRING_LENGTH(thr)) {
 			duk_int_t lf_len = DUK_LFUNC_FLAGS_GET_LENGTH(lf_flags);
@@ -2640,7 +2668,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_getprop(duk_hthread *thr, duk_tval *tv_obj, 
 
 	/* key coercion (unless already coerced above) */
 	DUK_ASSERT(key == NULL);
-	arr_idx = duk__push_tval_to_hstring_arr_idx(ctx, tv_key, &key);
+	arr_idx = duk__push_tval_to_property_key(ctx, tv_key, &key);
 	DUK_ASSERT(key != NULL);
 
 	/*
@@ -2825,9 +2853,9 @@ DUK_INTERNAL duk_bool_t duk_hobject_hasprop(duk_hthread *thr, duk_tval *tv_obj, 
 		obj = DUK_TVAL_GET_OBJECT(tv_obj);
 		DUK_ASSERT(obj != NULL);
 
-		arr_idx = duk__push_tval_to_hstring_arr_idx(ctx, tv_key, &key);
+		arr_idx = duk__push_tval_to_property_key(ctx, tv_key, &key);
 	} else if (DUK_TVAL_IS_BUFFER(tv_obj)) {
-		arr_idx = duk__push_tval_to_hstring_arr_idx(ctx, tv_key, &key);
+		arr_idx = duk__push_tval_to_property_key(ctx, tv_key, &key);
 		if (duk__key_is_plain_buf_ownprop(thr, DUK_TVAL_GET_BUFFER(tv_obj), key, arr_idx)) {
 			rc = 1;
 			goto pop_and_return;
@@ -2838,7 +2866,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_hasprop(duk_hthread *thr, duk_tval *tv_obj, 
 		obj = thr->builtins[DUK_BIDX_OBJECT_PROTOTYPE];
 #endif
 	} else if (DUK_TVAL_IS_LIGHTFUNC(tv_obj)) {
-		arr_idx = duk__push_tval_to_hstring_arr_idx(ctx, tv_key, &key);
+		arr_idx = duk__push_tval_to_property_key(ctx, tv_key, &key);
 		if (duk__key_is_lightfunc_ownprop(thr, key)) {
 			rc = 1;
 			goto pop_and_return;
@@ -3380,8 +3408,15 @@ DUK_INTERNAL duk_bool_t duk_hobject_putprop(duk_hthread *thr, duk_tval *tv_obj, 
 		 */
 
 		DUK_ASSERT(key == NULL);
-		arr_idx = duk__push_tval_to_hstring_arr_idx(ctx, tv_key, &key);
+		arr_idx = duk__push_tval_to_property_key(ctx, tv_key, &key);
 		DUK_ASSERT(key != NULL);
+
+		if (DUK_HSTRING_HAS_ES6SYMBOL(h)) {
+			/* Symbols don't have virtual properties. */
+			/* FIXME: what about hidden symbols? */
+			curr = thr->builtins[DUK_BIDX_SYMBOL_PROTOTYPE];
+			goto lookup;
+		}
 
 		if (key == DUK_HTHREAD_STRING_LENGTH(thr)) {
 			goto fail_not_writable;
@@ -3466,7 +3501,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_putprop(duk_hthread *thr, duk_tval *tv_obj, 
 				/* Target object must be checked for a conflicting
 				 * non-configurable property.
 				 */
-				arr_idx = duk__push_tval_to_hstring_arr_idx(ctx, tv_key, &key);
+				arr_idx = duk__push_tval_to_property_key(ctx, tv_key, &key);
 				DUK_ASSERT(key != NULL);
 
 				if (duk__get_own_propdesc_raw(thr, h_target, key, arr_idx, &desc, DUK_GETDESC_FLAG_PUSH_VALUE)) {
@@ -3529,7 +3564,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_putprop(duk_hthread *thr, duk_tval *tv_obj, 
 			DUK_DDD(DUK_DDDPRINT("base object buffer, key is a fast-path number; arr_idx %ld", (long) arr_idx));
 			pop_count = 0;
 		} else {
-			arr_idx = duk__push_tval_to_hstring_arr_idx(ctx, tv_key, &key);
+			arr_idx = duk__push_tval_to_property_key(ctx, tv_key, &key);
 			DUK_ASSERT(key != NULL);
 			DUK_DDD(DUK_DDDPRINT("base object buffer, key is a non-fast-path number; after "
 			                     "coercion key is %!T, arr_idx %ld",
@@ -3568,7 +3603,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_putprop(duk_hthread *thr, duk_tval *tv_obj, 
 			/* This is a pretty awkward control flow, but we need to recheck the
 			 * key coercion here.
 			 */
-			arr_idx = duk__push_tval_to_hstring_arr_idx(ctx, tv_key, &key);
+			arr_idx = duk__push_tval_to_property_key(ctx, tv_key, &key);
 			DUK_ASSERT(key != NULL);
 			DUK_DDD(DUK_DDDPRINT("base object buffer, key is a non-fast-path number; after "
 			                     "coercion key is %!T, arr_idx %ld",
@@ -3603,7 +3638,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_putprop(duk_hthread *thr, duk_tval *tv_obj, 
 		 * by an inherited setter which means we can't stop the lookup here.
 		 */
 
-		arr_idx = duk__push_tval_to_hstring_arr_idx(ctx, tv_key, &key);
+		arr_idx = duk__push_tval_to_property_key(ctx, tv_key, &key);
 
 		if (duk__key_is_lightfunc_ownprop(thr, key)) {
 			goto fail_not_writable;
@@ -3627,7 +3662,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_putprop(duk_hthread *thr, duk_tval *tv_obj, 
 	}
 
 	DUK_ASSERT(key == NULL);
-	arr_idx = duk__push_tval_to_hstring_arr_idx(ctx, tv_key, &key);
+	arr_idx = duk__push_tval_to_property_key(ctx, tv_key, &key);
 	DUK_ASSERT(key != NULL);
 
  lookup:
@@ -4436,7 +4471,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_delprop(duk_hthread *thr, duk_tval *tv_obj, 
 				/* Target object must be checked for a conflicting
 				 * non-configurable property.
 				 */
-				arr_idx = duk__push_tval_to_hstring_arr_idx(ctx, tv_key, &key);
+				arr_idx = duk__push_tval_to_property_key(ctx, tv_key, &key);
 				DUK_ASSERT(key != NULL);
 
 				if (duk__get_own_propdesc_raw(thr, h_target, key, arr_idx, &desc, 0 /*flags*/)) {  /* don't push value */
@@ -4462,8 +4497,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_delprop(duk_hthread *thr, duk_tval *tv_obj, 
 		}
 #endif  /* DUK_USE_ES6_PROXY */
 
-		duk_to_string(ctx, -1);
-		key = duk_get_hstring(ctx, -1);
+		key = duk_to_hstring(ctx, -1);  /* FIXME: symbol */
 		DUK_ASSERT(key != NULL);
 
 		rc = duk_hobject_delprop_raw(thr, obj, key, throw_flag ? DUK_DELPROP_FLAG_THROW : 0);
@@ -4472,11 +4506,11 @@ DUK_INTERNAL duk_bool_t duk_hobject_delprop(duk_hthread *thr, duk_tval *tv_obj, 
 		/* XXX: unnecessary string coercion for array indices,
 		 * intentional to keep small.
 		 */
+		/* FIXME: SYMBOL */
 		duk_hstring *h = DUK_TVAL_GET_STRING(tv_obj);
 		DUK_ASSERT(h != NULL);
 
-		duk_to_string(ctx, -1);
-		key = duk_get_hstring(ctx, -1);
+		key = duk_to_hstring(ctx, -1);
 		DUK_ASSERT(key != NULL);
 
 		if (key == DUK_HTHREAD_STRING_LENGTH(thr)) {
@@ -4497,8 +4531,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_delprop(duk_hthread *thr, duk_tval *tv_obj, 
 		duk_hbuffer *h = DUK_TVAL_GET_BUFFER(tv_obj);
 		DUK_ASSERT(h != NULL);
 
-		duk_to_string(ctx, -1);
-		key = duk_get_hstring(ctx, -1);
+		key = duk_to_hstring(ctx, -1);
 		DUK_ASSERT(key != NULL);
 
 		if (key == DUK_HTHREAD_STRING_LENGTH(thr)) {
@@ -4516,8 +4549,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_delprop(duk_hthread *thr, duk_tval *tv_obj, 
 		 * reject if match any of them.
 		 */
 
-		duk_to_string(ctx, -1);
-		key = duk_get_hstring(ctx, -1);
+		key = duk_to_hstring(ctx, -1);
 		DUK_ASSERT(key != NULL);
 
 		if (duk__key_is_lightfunc_ownprop(thr, key)) {
@@ -4867,8 +4899,7 @@ DUK_INTERNAL duk_ret_t duk_hobject_object_get_own_property_descriptor(duk_contex
 	DUK_ASSERT(thr->heap != NULL);
 
 	obj = duk_require_hobject_promote_mask(ctx, 0, DUK_TYPE_MASK_LIGHTFUNC | DUK_TYPE_MASK_BUFFER);
-	(void) duk_to_string(ctx, 1);
-	key = duk_require_hstring(ctx, 1);
+	key = duk_to_hstring(ctx, 1);  /* FIXME: accept symbol */
 
 	DUK_ASSERT(obj != NULL);
 	DUK_ASSERT(key != NULL);
@@ -5973,7 +6004,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_object_ownprop_helper(duk_context *ctx, duk_
 	duk_bool_t ret;
 
 	/* coercion order matters */
-	h_v = duk_to_hstring(ctx, 0);
+	h_v = duk_to_hstring(ctx, 0);  /* FIXME: accept symbol */
 	DUK_ASSERT(h_v != NULL);
 
 	h_obj = duk_push_this_coercible_to_object(ctx);

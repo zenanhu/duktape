@@ -90,10 +90,17 @@ duk_hstring *duk__alloc_init_hstring(duk_heap *heap,
 	 * in case user code happens to use a string also used by Duktape
 	 * (such as string has already been interned and has the 'internal'
 	 * flag set).
+	 *
+	 * FIXME: also [0x80,0xbf] i.e. UTF-8 continuation bytes, used for symbols.
 	 */
 	DUK_ASSERT(!DUK_HSTRING_HAS_INTERNAL(res));
-	if (blen > 0 && str[0] == (duk_uint8_t) 0xff) {
-		DUK_HSTRING_SET_INTERNAL(res);
+	if (blen > 0) {
+		if (str[0] == 0xffU) {
+			DUK_HSTRING_SET_INTERNAL(res);
+		} else if ((str[0] & 0xc0U) == 0x80U) {
+			DUK_HSTRING_SET_INTERNAL(res);
+			DUK_HSTRING_SET_ES6SYMBOL(res);
+		}
 	}
 
 	DUK_HSTRING_SET_HASH(res, strhash);
