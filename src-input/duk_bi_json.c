@@ -352,6 +352,7 @@ DUK_LOCAL duk_small_int_t duk__dec_string_escape(duk_json_dec_ctx *js_ctx, duk_u
 		break;
 	}
 #ifdef DUK_USE_JX
+	/* FIXME: use standard ES6 non-bmp escape? */
 	case DUK_ASC_UC_U: {
 		if (js_ctx->flag_ext_custom) {
 			cp = duk__dec_decode_hex_escape(js_ctx, 8);
@@ -1121,6 +1122,7 @@ DUK_LOCAL duk_uint8_t *duk__emit_esc_auto_fast(duk_json_enc_ctx *js_ctx, duk_uin
 	} else {
 #ifdef DUK_USE_JX
 		if (DUK_LIKELY(js_ctx->flag_ext_custom)) {
+			/* FIXME: use standard ES6 non-bmp escape? */
 			tmp = DUK__MKESC(8, DUK_ASC_BACKSLASH, DUK_ASC_UC_U);
 		} else
 #endif
@@ -1130,6 +1132,7 @@ DUK_LOCAL duk_uint8_t *duk__emit_esc_auto_fast(duk_json_enc_ctx *js_ctx, duk_uin
 			 * roundtrip but will still be more or less readable and
 			 * more useful than an error.
 			 */
+			/* FIXME: make this resemble \u{NNNNN} too? */
 			tmp = DUK__MKESC(8, DUK_ASC_UC_U, DUK_ASC_PLUS);
 		}
 	}

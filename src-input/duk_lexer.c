@@ -1147,6 +1147,7 @@ void duk_lexer_parse_js_input_element(duk_lexer_ctx *lex_ctx,
 					adv = 4 - 1;
 					DUK__APPENDBUFFER(lex_ctx, duk__decode_hexesc_from_window(lex_ctx, 2));
 				} else if (x == 'u') {
+					/* FIXME: add ES6 \u{NNNNN} escape. */
 					adv = 6 - 1;
 					DUK__APPENDBUFFER(lex_ctx, duk__decode_uniesc_from_window(lex_ctx, 2));
 				} else if (DUK__ISDIGIT(x)) {
@@ -1293,6 +1294,7 @@ void duk_lexer_parse_js_input_element(duk_lexer_ctx *lex_ctx,
 					DUK_ERROR_SYNTAX(lex_ctx->thr, "invalid unicode escape in identifier");
 				}
 
+				/* FIXME */
 				ch = duk__decode_uniesc_from_window(lex_ctx, 2);
 
 				/* IdentifierStart is stricter than IdentifierPart, so if the first
@@ -1724,6 +1726,10 @@ DUK_INTERNAL void duk_lexer_parse_re_token(duk_lexer_ctx *lex_ctx, duk_re_token 
 			out_token->num = duk__decode_hexesc_from_window(lex_ctx, 2);
 			advtok = DUK__ADVTOK(4, DUK_RETOK_ATOM_CHAR);
 		} else if (y == 'u') {
+			/* FIXME: Same escape support here */
+			/* FIXME: future work issue for surrogate pairs here, maybe they can be parsed
+			 * into UTF-8 for matching.
+			 */
 			out_token->num = duk__decode_uniesc_from_window(lex_ctx, 2);
 			advtok = DUK__ADVTOK(6, DUK_RETOK_ATOM_CHAR);
 		} else if (y == 'd') {
